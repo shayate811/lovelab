@@ -1,0 +1,34 @@
+- name: swap を無効化
+  command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+
+- name: /etc/fstab から swap を削除
+  lineinfile:
+    path: /etc/fstab
+    regexp: '^\S+\s+\S+\s+swap\s'
+    state: absent
+
+- name: カーネルモジュールを有効化
+  modprobe:
+    name: "{{ item }}"
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: modules-load.d に永続化
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+
+- name: sysctl パラメータ設定
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_set: true
+    reload: true
+  loop:
+    - { key: net.bridge.bridge-nf-call-iptables,  value: "1" }
+    - { key: net.bridge.bridge-nf-call-ip6tables, value: "1" }
+    - { key: net.ipv4.ip_forward,                  value: "1" }

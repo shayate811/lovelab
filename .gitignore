@@ -1,0 +1,52 @@
+# ─── Terraform ───────────────────────────────────────────────
+# プロバイダキャッシュ（再生成可能）
+terraform/.terraform/
+
+# 認証情報・環境固有の値（絶対にコミットしない）
+terraform/*.tfvars
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/crash.log
+terraform/*.tfplan
+*.tfplan
+
+# NOTE: .terraform.lock.hcl はコミット対象（プロバイダバージョンロック）
+
+# ─── Ansible ─────────────────────────────────────────────────
+# Ansible Vault パスワードファイル
+ansible/.vault_pass
+ansible/vault_password
+ansible/vault_password.txt
+
+# 実行ログ
+ansible/*.retry
+ansible/ansible.log
+
+# kubeconfig（クラスタへの管理者アクセス権が含まれる）
+ansible/kubeconfig.yaml
+kubeconfig.yaml
+*.kubeconfig
+
+# ─── 秘密鍵・証明書 ───────────────────────────────────────────
+*.pem
+*.key
+*.crt
+*.cer
+*.pfx
+*.p12
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+id_ecdsa
+id_ecdsa.*
+
+# ─── 環境変数ファイル ─────────────────────────────────────────
+.env
+.env.*
+
+# ─── OS・エディタ ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

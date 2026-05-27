@@ -1,0 +1,9 @@
+# このファイルを terraform.tfvars にコピーして実際の値を記入する
+# terraform.tfvars は .gitignore で除外済み
+
+proxmox_endpoint = "https://192.168.1.x:8006"
+proxmox_username = "root@pam"
+proxmox_password = "your-proxmox-password"
+proxmox_host_ip  = "192.168.1.x"
+proxmox_ssh_key  = "~/.ssh/id_ed25519"
+ssh_public_key   = "ssh-ed25519 AAAA..."

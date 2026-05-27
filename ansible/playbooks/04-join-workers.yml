@@ -1,0 +1,7 @@
+- hosts: k8s_workers
+  become: true
+  tasks:
+    - name: worker をクラスタに参加させる
+      command: "{{ hostvars[groups['k8s_control_plane'][0]]['k8s_join_command'] }}"
+      args:
+        creates: /etc/kubernetes/kubelet.conf

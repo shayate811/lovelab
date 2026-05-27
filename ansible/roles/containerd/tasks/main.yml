@@ -1,0 +1,30 @@
+- name: Docker GPG キーを追加
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: containerd リポジトリを追加
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+
+- name: containerd をインストール
+  apt:
+    name: containerd.io
+    update_cache: true
+
+- name: デフォルト設定を生成
+  shell: containerd config default > /etc/containerd/config.toml
+  args:
+    creates: /etc/containerd/config.toml
+
+- name: SystemdCgroup を有効化
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    replace: 'SystemdCgroup = true'
+
+- name: containerd を起動・有効化
+  service:
+    name: containerd
+    state: restarted
+    enabled: true
