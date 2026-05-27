@@ -307,14 +307,13 @@ flowchart TD
 
 | Phase | Feature |
 |-------|---------|
-| **Current** | 3-node K8s cluster (1 control plane + 2 workers) |
+| **Current** | 3-node K8s cluster + Cilium CNI + ArgoCD (GitOps handoff point) |
 | Phase 2 | MetalLB — bare-metal LoadBalancer IP pool |
 | Phase 2 | Ingress-NGINX — HTTP/HTTPS routing |
 | Phase 3 | Longhorn — distributed block storage (PVC) |
-| Phase 3 | ArgoCD — GitOps application delivery |
+| Phase 3 | Synology CSI Driver — NFS/iSCSI persistent volumes from DS218+ |
 | Phase 4 | Terraform remote state on self-hosted Minio |
-| Phase 4 | Synology CSI Driver — NFS/iSCSI persistent volumes from DS218+ |
-| Phase 5 | eGPU via OCuLink — Ollama / local LLM inference |
+| Phase 5 | eGPU via OCuLink — Ollama / vLLM local inference (RAM upgrade to 64GB) |
 
 ---
 
@@ -623,14 +622,13 @@ flowchart TD
 
 | フェーズ | 内容 |
 |---------|------|
-| **現在** | 3 ノード K8s クラスタ（コントロールプレーン 1 台 + ワーカー 2 台） |
+| **現在** | 3 ノード K8s クラスタ + Cilium CNI + ArgoCD（GitOps への引き渡し点） |
 | Phase 2 | MetalLB — ベアメタル環境での LoadBalancer IP プール |
 | Phase 2 | Ingress-NGINX — HTTP/HTTPS ルーティング |
 | Phase 3 | Longhorn — 分散ブロックストレージ（PVC） |
-| Phase 3 | ArgoCD — GitOps アプリケーションデリバリー |
+| Phase 3 | Synology CSI Driver — DS218+ から NFS/iSCSI で永続ボリューム提供 |
 | Phase 4 | Terraform リモートステートをセルフホスト Minio に移行 |
-| Phase 4 | Synology CSI Driver — DS218+ から NFS/iSCSI で永続ボリュームを提供 |
-| Phase 5 | OCuLink 経由の eGPU — Ollama / ローカル LLM 推論 |
+| Phase 5 | OCuLink 経由の eGPU — Ollama / vLLM ローカル推論（RAM 64GB 換装） |
 
 ---
 

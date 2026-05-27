@@ -2,3 +2,4 @@
 - import_playbook: playbooks/02-install.yml
 - import_playbook: playbooks/03-init-cluster.yml
 - import_playbook: playbooks/04-join-workers.yml
+- import_playbook: playbooks/05-gitops.yml
