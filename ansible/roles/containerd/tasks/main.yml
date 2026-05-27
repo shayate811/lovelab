@@ -22,9 +22,10 @@
     path: /etc/containerd/config.toml
     regexp: 'SystemdCgroup = false'
     replace: 'SystemdCgroup = true'
+  notify: restart containerd
 
 - name: containerd を起動・有効化
   service:
     name: containerd
-    state: restarted
+    state: started
     enabled: true
