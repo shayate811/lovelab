@@ -1,7 +1,13 @@
 - hosts: k8s_workers
   become: true
   tasks:
+    - name: join コマンドを control plane から読み込む
+      slurp:
+        src: /tmp/k8s_join_command.sh
+      delegate_to: "{{ groups['k8s_control_plane'][0] }}"
+      register: join_cmd_raw
+
     - name: worker をクラスタに参加させる
-      command: "{{ hostvars[groups['k8s_control_plane'][0]]['k8s_join_command'] }}"
+      command: "{{ join_cmd_raw.content | b64decode | trim }}"
       args:
         creates: /etc/kubernetes/kubelet.conf

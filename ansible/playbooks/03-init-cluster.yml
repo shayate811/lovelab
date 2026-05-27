@@ -52,3 +52,9 @@
     - name: join コマンドを fact として保存
       set_fact:
         k8s_join_command: "{{ join_command.stdout }}"
+
+    - name: join コマンドをファイルに保存
+      copy:
+        content: "{{ join_command.stdout }}"
+        dest: /tmp/k8s_join_command.sh
+        mode: "0600"
