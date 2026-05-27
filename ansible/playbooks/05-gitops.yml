@@ -3,11 +3,17 @@
   tasks:
     - name: ArgoCD namespace を作成
       become_user: ubuntu
-      command: kubectl create namespace argocd
-      args:
-        creates: /tmp/argocd-ns-created
+      shell: |
+        kubectl apply -f - <<'EOF'
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: argocd
+        EOF
+      environment:
+        KUBECONFIG: /home/ubuntu/.kube/config
       register: ns_result
-      failed_when: ns_result.rc != 0 and 'already exists' not in ns_result.stderr
+      changed_when: "'created' in ns_result.stdout"
 
     - name: ArgoCD をインストール
       become_user: ubuntu
