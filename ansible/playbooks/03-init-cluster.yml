@@ -24,9 +24,26 @@
         mode: "0600"
         remote_src: true
 
-    - name: Flannel CNI を適用
+    - name: Helm をインストール
+      shell: curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Cilium Helm リポジトリを追加
       become_user: ubuntu
-      command: kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+      command: helm repo add cilium https://helm.cilium.io/
+      register: helm_repo
+      changed_when: "'already exists' not in helm_repo.stderr"
+
+    - name: Cilium CNI をインストール
+      become_user: ubuntu
+      shell: |
+        helm upgrade --install cilium cilium/cilium \
+          --namespace kube-system \
+          --set ipam.mode=kubernetes \
+          --set kubeProxyReplacement=false
+      environment:
+        KUBECONFIG: /home/ubuntu/.kube/config
 
     - name: join コマンドを取得
       command: kubeadm token create --print-join-command

@@ -44,12 +44,12 @@ resource "proxmox_virtual_environment_vm" "k8s_node" {
   }
 
   memory {
-    dedicated = 8192
+    dedicated = 6144
   }
 
   disk {
     datastore_id = var.storage
-    size         = 50
+    size         = 80
     interface    = "scsi0"
   }
 

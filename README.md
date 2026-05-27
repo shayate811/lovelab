@@ -4,19 +4,19 @@
 
 ```mermaid
 graph TB
-    subgraph LoveLab["LoveLab — GMKtec NucBox K11"]
-        subgraph Proxmox["Proxmox VE 8.x"]
-            n1["node-01\ncontrol plane\n192.168.1.101"]
-            n2["node-02\nworker\n192.168.1.102"]
-            n3["node-03\nworker\n192.168.1.103"]
-        end
-    end
-
     TF(["Terraform"])
     AN(["Ansible"])
 
-    TF -- "VM provisioning (the box)" --> Proxmox
-    AN -- "K8s installation (the soul)" --> Proxmox
+    subgraph host["GMKtec NucBox K11"]
+        subgraph pve["Proxmox VE 8.x"]
+            n1["node-01<br/>control plane<br/>192.168.1.101"]
+            n2["node-02<br/>worker<br/>192.168.1.102"]
+            n3["node-03<br/>worker<br/>192.168.1.103"]
+        end
+    end
+
+    TF -- "VM provisioning" --> n1 & n2 & n3
+    AN -- "K8s install" --> n1 & n2 & n3
 ```
 
 ---
@@ -45,7 +45,7 @@ LoveLab is a fully automated, IaC-driven Kubernetes homelab running on a single 
 
 - **One command** (`make`) to go from a fresh Proxmox install to a running 3-node Kubernetes cluster
 - **Terraform** handles VM lifecycle: creates an Ubuntu 24.04 cloud image template if one doesn't exist, then clones it into 3 VMs with static IPs, cloud-init, and QEMU Guest Agent
-- **Ansible** handles the K8s stack: containerd → kubeadm/kubelet/kubectl → `kubeadm init` on the control plane → Flannel CNI → worker joins
+- **Ansible** handles the K8s stack: containerd → kubeadm/kubelet/kubectl → `kubeadm init` on the control plane → Cilium CNI → worker joins
 - **Idempotent**: re-running `make` is safe. Terraform skips existing resources; Ansible skips completed steps
 - **Destroy and rebuild in minutes**: `make destroy && make` gives you a clean cluster
 
@@ -58,7 +58,7 @@ LoveLab is a fully automated, IaC-driven Kubernetes homelab running on a single 
 | OS | Ubuntu 24.04 LTS | Long-term support, excellent Kubernetes support, cloud image available |
 | Container runtime | containerd | The de-facto standard; what kubeadm expects |
 | K8s distribution | kubeadm (vanilla K8s) | CKA exam parity; understand every moving part |
-| CNI | Flannel | Minimal config, solid VXLAN overlay, easy to replace later |
+| CNI | Cilium | eBPF-based; full NetworkPolicy support; required for CKS; replaces iptables |
 | Config management | Ansible | Readable YAML, no agent required on nodes, battle-tested |
 
 ---
@@ -79,14 +79,14 @@ LoveLab is a fully automated, IaC-driven Kubernetes homelab running on a single 
 
 | Node | Role | vCPU | RAM | Disk | IP |
 |------|------|------|-----|------|----|
-| node-01 | control plane | 4 | 8 GB | 50 GB | 192.168.1.101 |
-| node-02 | worker | 4 | 8 GB | 50 GB | 192.168.1.102 |
-| node-03 | worker | 4 | 8 GB | 50 GB | 192.168.1.103 |
+| node-01 | control plane | 4 | 6 GB | 80 GB | 192.168.1.101 |
+| node-02 | worker | 4 | 6 GB | 80 GB | 192.168.1.102 |
+| node-03 | worker | 4 | 6 GB | 80 GB | 192.168.1.103 |
 
 Allocation rationale:
 - **vCPU**: 4 × 3 = 12 threads used (out of 16). 4 threads reserved for Proxmox host
-- **RAM**: 8 × 3 = 24 GB used (out of 32 GB). 8 GB reserved for Proxmox + future VMs
-- **Disk**: 50 × 3 = 150 GB used (out of 1 TB). Remaining ~818 GB available for Longhorn, etc.
+- **RAM**: 6 × 3 = 18 GB used (out of 32 GB). 14 GB reserved for Proxmox host + ZFS ARC buffer
+- **Disk**: 80 × 3 = 240 GB used (out of 1 TB). Remaining ~760 GB available for Longhorn, etc.
 
 ---
 
@@ -98,7 +98,7 @@ Allocation rationale:
 | Guest OS | Ubuntu Server | 24.04 LTS (Noble) |
 | Kubernetes | kubeadm / kubelet / kubectl | 1.31.x |
 | Container runtime | containerd | 1.7.x |
-| CNI | Flannel | latest |
+| CNI | Cilium | latest |
 | VM provisioner | Terraform (`bpg/proxmox`) | 1.9.x / ~0.61 |
 | Config management | Ansible | 2.16.x |
 
@@ -117,7 +117,7 @@ K8s node IPs (static via cloud-init, on vmbr0)
   node-03  192.168.1.103/24   gw: 192.168.1.1
 
 K8s internal networks
-  Pod CIDR     10.244.0.0/16   (Flannel default)
+  Pod CIDR     10.244.0.0/16   (Cilium default)
   Service CIDR 10.96.0.0/12    (kubeadm default)
 
 Storage network (Phase 3+)
@@ -161,7 +161,7 @@ lovelab/
     └── playbooks/
         ├── 01-preflight.yml          # Applies role: common
         ├── 02-install.yml            # Applies roles: containerd, kubernetes
-        ├── 03-init-cluster.yml       # kubeadm init, Flannel, capture join command
+        ├── 03-init-cluster.yml       # kubeadm init, Cilium, capture join command
         └── 04-join-workers.yml       # kubeadm join on node-02 and node-03
 ```
 
@@ -268,7 +268,7 @@ flowchart TD
     end
 
     subgraph VM["k8s_node × 3"]
-        G["full clone of template 9000\n4 vCPU · 8 GB · 50 GB\nstatic IP · SSH key injected"]
+        G["full clone of template 9000\n4 vCPU · 6 GB · 80 GB\nstatic IP · SSH key injected"]
     end
 ```
 
@@ -289,7 +289,7 @@ flowchart TD
 
     subgraph P3["03-init-cluster — node-01 only"]
         B1["kubeadm init\n--pod-network-cidr=10.244.0.0/16"]
-        B2["kubectl apply\nFlannel CNI"]
+        B2["kubectl apply\nCilium CNI"]
         B3["kubeadm token create\ncapture join command"]
         B1 --> B2 --> B3
     end
@@ -325,7 +325,7 @@ flowchart TD
 - [bpg/terraform-provider-proxmox](https://github.com/bpg/terraform-provider-proxmox) — The Proxmox Terraform provider used in this repo.
 - [Proxmox VE Documentation](https://pve.proxmox.com/pve-docs/)
 - [kubeadm Installation Guide](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/)
-- [Flannel CNI](https://github.com/flannel-io/flannel)
+- [Cilium CNI](https://github.com/cilium/cilium)
 
 ---
 
@@ -361,7 +361,7 @@ LoveLab は、GMKtec NucBox K11 の単一ベアメタルマシン上で Proxmox 
 
 - Proxmox をインストールした状態から `make` 一発で K8s クラスタが立ち上がる
 - **Terraform** が VM ライフサイクルを管理：Ubuntu 24.04 cloud image のテンプレートを作成し、3 台の VM としてクローンする
-- **Ansible** が K8s スタックを構成：containerd → kubeadm/kubelet/kubectl → `kubeadm init` → Flannel CNI → worker join
+- **Ansible** が K8s スタックを構成：containerd → kubeadm/kubelet/kubectl → `kubeadm init` → Cilium CNI → worker join
 - **冪等性**：`make` を何度実行しても安全。既存リソースはスキップされる
 - **壊して作り直せる**：`make destroy && make` で数分以内にクリーンなクラスタが復元できる
 
@@ -374,7 +374,7 @@ LoveLab は、GMKtec NucBox K11 の単一ベアメタルマシン上で Proxmox 
 | OS | Ubuntu 24.04 LTS | 長期サポート・K8s サポートが厚い・cloud image が公式提供 |
 | コンテナランタイム | containerd | 事実上の標準；kubeadm が期待するランタイム |
 | K8s ディストリ | kubeadm（バニラ K8s） | CKA 試験環境と一致；内部の動きをすべて理解できる |
-| CNI | Flannel | 設定最小・安定した VXLAN オーバーレイ・後から交換しやすい |
+| CNI | Cilium | eBPF ベース・NetworkPolicy フル対応・CKS 必須・iptables を置換 |
 | 構成管理 | Ansible | 読みやすい YAML・ノードへのエージェント不要・実績豊富 |
 
 ---
@@ -395,14 +395,14 @@ LoveLab は、GMKtec NucBox K11 の単一ベアメタルマシン上で Proxmox 
 
 | ノード | 役割 | vCPU | RAM | Disk | IP |
 |--------|------|------|-----|------|----|
-| node-01 | コントロールプレーン | 4 | 8 GB | 50 GB | 192.168.1.101 |
-| node-02 | ワーカー | 4 | 8 GB | 50 GB | 192.168.1.102 |
-| node-03 | ワーカー | 4 | 8 GB | 50 GB | 192.168.1.103 |
+| node-01 | コントロールプレーン | 4 | 6 GB | 80 GB | 192.168.1.101 |
+| node-02 | ワーカー | 4 | 6 GB | 80 GB | 192.168.1.102 |
+| node-03 | ワーカー | 4 | 6 GB | 80 GB | 192.168.1.103 |
 
 配分の根拠：
 - **vCPU**：4 × 3 = 12 スレッド使用（16T 中）。Proxmox ホスト用に 4T 確保
-- **RAM**：8 × 3 = 24 GB 使用（32GB 中）。Proxmox OS + 将来 VM 用に 8GB 余裕
-- **Disk**：50 × 3 = 150 GB 使用（1TB 中）。残 ~818 GB は Longhorn 等に転用可
+- **RAM**：6 × 3 = 18 GB 使用（32GB 中）。Proxmox ホスト + ZFS ARC バッファ用に 14GB 確保
+- **Disk**：80 × 3 = 240 GB 使用（1TB 中）。残 ~760 GB は Longhorn 等に転用可
 
 ---
 
@@ -414,7 +414,7 @@ LoveLab は、GMKtec NucBox K11 の単一ベアメタルマシン上で Proxmox 
 | ゲスト OS | Ubuntu Server | 24.04 LTS（Noble） |
 | Kubernetes | kubeadm / kubelet / kubectl | 1.31.x |
 | コンテナランタイム | containerd | 1.7.x |
-| CNI | Flannel | latest |
+| CNI | Cilium | latest |
 | VM プロビジョナー | Terraform（`bpg/proxmox`） | 1.9.x / ~0.61 |
 | 構成管理 | Ansible | 2.16.x |
 
@@ -433,7 +433,7 @@ K8s ノード IP（cloud-init でスタティック設定、vmbr0 上）
   node-03  192.168.1.103/24   gw: 192.168.1.1
 
 K8s 内部ネットワーク
-  Pod CIDR     10.244.0.0/16   （Flannel のデフォルト）
+  Pod CIDR     10.244.0.0/16   （Cilium のデフォルト）
   Service CIDR 10.96.0.0/12    （kubeadm のデフォルト）
 
 ストレージネットワーク（Phase 3+）
@@ -477,7 +477,7 @@ lovelab/
     └── playbooks/
         ├── 01-preflight.yml          # role: common を適用
         ├── 02-install.yml            # role: containerd、kubernetes を適用
-        ├── 03-init-cluster.yml       # kubeadm init・Flannel・join コマンド取得
+        ├── 03-init-cluster.yml       # kubeadm init・Cilium・join コマンド取得
         └── 04-join-workers.yml       # node-02・03 をクラスタに join
 ```
 
@@ -584,7 +584,7 @@ flowchart TD
     end
 
     subgraph VM["k8s_node × 3"]
-        G["テンプレート 9000 をフルクローン\n4 vCPU · 8 GB · 50 GB\nスタティック IP · SSH 鍵注入"]
+        G["テンプレート 9000 をフルクローン\n4 vCPU · 6 GB · 80 GB\nスタティック IP · SSH 鍵注入"]
     end
 ```
 
@@ -605,7 +605,7 @@ flowchart TD
 
     subgraph P3["03-init-cluster — node-01 のみ"]
         B1["kubeadm init\n--pod-network-cidr=10.244.0.0/16"]
-        B2["kubectl apply\nFlannel CNI"]
+        B2["kubectl apply\nCilium CNI"]
         B3["kubeadm token create\njoin コマンドを取得・保存"]
         B1 --> B2 --> B3
     end
@@ -641,4 +641,4 @@ flowchart TD
 - [bpg/terraform-provider-proxmox](https://github.com/bpg/terraform-provider-proxmox) — 本リポジトリで使用している Proxmox Terraform プロバイダ。
 - [Proxmox VE ドキュメント](https://pve.proxmox.com/pve-docs/)
 - [kubeadm インストールガイド](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/)
-- [Flannel CNI](https://github.com/flannel-io/flannel)
+- [Cilium CNI](https://github.com/cilium/cilium)
