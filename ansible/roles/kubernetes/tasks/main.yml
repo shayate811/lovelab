@@ -10,10 +10,19 @@
 - name: kubeadm・kubelet・kubectl をインストール
   apt:
     name:
-      - kubelet
-      - kubeadm
-      - kubectl
+      - "kubelet={{ k8s_version }}.*"
+      - "kubeadm={{ k8s_version }}.*"
+      - "kubectl={{ k8s_version }}.*"
     update_cache: true
+
+- name: K8s パッケージを hold（apt upgrade で上書きされないよう固定）
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
 
 - name: kubelet を有効化
   service:
